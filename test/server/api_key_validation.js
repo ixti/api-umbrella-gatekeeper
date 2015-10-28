@@ -604,4 +604,42 @@ describe('api key validation', function() {
       });
     });
   });
+
+  describe('custom API key param name', function () {
+    shared.runServer({
+      gatekeeper: {
+        api_key_header_name: 'x-auth-token',
+        api_key_param_name:  'auth_token'
+      }
+    });
+
+    describe('invalid api key supplied', function () {
+      it('does not call the target app', function(done) {
+        request.get('http://localhost:9333/hello?auth_token=invalid', function(error, response, body) {
+          backendCalled.should.eql(false);
+          response.statusCode.should.eql(403);
+          body.should.include('API_KEY_INVALID');
+          done();
+        });
+      });
+    });
+
+    describe('valid api key supplied', function() {
+      it('calls the target app', function(done) {
+        request.get('http://localhost:9333/hello?auth_token=' + this.apiKey, function(error, response, body) {
+          backendCalled.should.eql(true);
+          response.statusCode.should.eql(200);
+          body.should.eql('Hello World');
+          done();
+        });
+      });
+
+      it('looks for the api key in the custom header', function(done) {
+        request.get('http://localhost:9333/hello', { headers: { 'X-Auth-Token': this.apiKey } }, function(error, response, body) {
+          body.should.eql('Hello World');
+          done();
+        });
+      });
+    });
+  });
 });

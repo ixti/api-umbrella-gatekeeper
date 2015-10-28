@@ -644,7 +644,7 @@ describe('request rewriting', function() {
             'x-dynamic-source': 'dynamic',
             // x-dynamic-missing is not set
             'x-dynamic-default-absent': 'default',
-            'x-dynamic-default-present': 'dynamic',            
+            'x-dynamic-default-present': 'dynamic',
           });
 
           done();
@@ -1362,6 +1362,147 @@ describe('request rewriting', function() {
         data.raw_url.should.contain(data.url.pathname);
         done();
       }.bind(this));
+    });
+  });
+
+  describe('with custom api key param name', function () {
+    describe('api key stripping', function() {
+      shared.runServer({
+        gatekeeper: {
+          api_key_header_name: 'X-Auth-Token',
+          api_key_param_name:  'auth_token'
+        }
+      });
+
+      it('strips the api key from the header', function(done) {
+        var options = { headers: { 'X-Auth-Token': this.apiKey } };
+
+        request.get('http://localhost:9333/info/', options, function(error, response, body) {
+          response.statusCode.should.eql(200);
+          var data = JSON.parse(body);
+
+          data.headers.should.not.have.property('x-auth-token');
+
+          done();
+        }.bind(this));
+      });
+
+      it('strips the api key from the query string', function(done) {
+        request.get('http://localhost:9333/info/?test=test&auth_token=' + this.apiKey, function(error, response, body) {
+          response.statusCode.should.eql(200);
+          var data = JSON.parse(body);
+
+          data.url.query.should.eql({ 'test': 'test' });
+
+          done();
+        }.bind(this));
+      });
+    });
+
+    describe('passing api key via header', function() {
+      shared.runServer({
+        gatekeeper: {
+          api_key_header_name: 'X-Auth-Token',
+          api_key_param_name:  'auth_token'
+        },
+        apis: [
+          {
+            frontend_host: 'localhost',
+            backend_host: 'example.com',
+            url_matches: [
+              {
+                frontend_prefix: '/',
+                backend_prefix: '/',
+              }
+            ],
+            settings: {
+              pass_api_key_header: true,
+            },
+          },
+        ],
+      });
+
+      // BROKEN
+      it('keeps the api key in the header', function(done) {
+        var options = _.merge(this.options, {
+          headers: { 'X-Auth-Token': this.apiKey }
+        });
+
+        request.get('http://localhost:9333/info/', options, function(error, response, body) {
+          response.statusCode.should.eql(200);
+          var data = JSON.parse(body);
+          data.headers['x-auth-token'].should.eql(this.apiKey);
+
+          done();
+        }.bind(this));
+      });
+
+      it('passes the api key in the header even if passed in via other means', function(done) {
+        request.get('http://localhost:9333/info/?test=test&auth_token=' + this.apiKey, function(error, response, body) {
+          response.statusCode.should.eql(200);
+          var data = JSON.parse(body);
+          data.headers['x-auth-token'].should.eql(this.apiKey);
+
+          done();
+        }.bind(this));
+      });
+
+      it('strips the api key from the query string', function(done) {
+        request.get('http://localhost:9333/info/?test=test&auth_token=' + this.apiKey, function(error, response, body) {
+          response.statusCode.should.eql(200);
+          var data = JSON.parse(body);
+          data.url.query.should.eql({ 'test': 'test' });
+
+          done();
+        }.bind(this));
+      });
+    });
+
+    describe('passing api key via get query param', function() {
+      shared.runServer({
+        gatekeeper: {
+          api_key_header_name: 'X-Auth-Token',
+          api_key_param_name:  'auth_token'
+        },
+        apis: [
+          {
+            frontend_host: 'localhost',
+            backend_host: 'example.com',
+            url_matches: [
+              {
+                frontend_prefix: '/',
+                backend_prefix: '/',
+              }
+            ],
+            settings: {
+              pass_api_key_query_param: true,
+            },
+          },
+        ],
+      });
+
+      it('keeps the api key in the query string', function(done) {
+        request.get('http://localhost:9333/info/?auth_token=' + this.apiKey, function(error, response, body) {
+          var data = JSON.parse(body);
+          data.url.query.auth_token.should.eql(this.apiKey);
+
+          done();
+        }.bind(this));
+      });
+
+      // BROKEN
+      it('passes the api key in the query string even if passed in via other means', function(done) {
+        var options = _.merge(this.options, {
+          headers: { 'X-Auth-Token': this.apiKey }
+        });
+
+        request.get('http://localhost:9333/info/', options, function(error, response, body) {
+          var data = JSON.parse(body);
+          data.url.query.auth_token.should.eql(this.apiKey);
+
+          done();
+        }.bind(this));
+      });
     });
   });
 });

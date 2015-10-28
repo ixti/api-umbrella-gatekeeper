@@ -18,6 +18,8 @@ gatekeeper:
   host: 127.0.0.1
   starting_port: 4000
   target: "127.0.0.1:6081"
+  api_key_header_name: "X-Api-Key"
+  api_key_param_name: "api_key"
   api_key_methods:
     - header
     - getParam
